@@ -46,3 +46,6 @@ local.properties
 .loadpath
 .project
 .cproject
+
+.cache
+compile_commands.json

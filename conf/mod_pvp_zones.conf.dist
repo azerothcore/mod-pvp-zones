@@ -1,0 +1,4 @@
+[worldserver]
+pvp_zones.Enable = 1
+pvp_zones.Zones = []
+pvp_area.Areas = []
