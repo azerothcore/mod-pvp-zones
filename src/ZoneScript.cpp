@@ -16,7 +16,8 @@
 // hardcoded until i can get a vector using GEtOption
 struct Config
 {
-    bool enabled = true;
+    bool   enabled   = true;
+    uint32 kill_goal = 0;
 
     std::unordered_map<uint32 /* zone */, /* areas */ std::vector<uint32>> ids = {{10, {93, 536}}};
 
@@ -24,12 +25,18 @@ struct Config
     uint32 current_zone;
     uint32 current_area;
 
+    std::string current_zone_name;
+    std::string current_area_name;
+
     bool active = false;
 
     std::vector<Player*> area_players;
     std::vector<Player*> zone_players;
 
     std::map<Player*, uint32> points;
+
+    time_t last_announcement  = 0;
+    time_t announcement_delay = 500;
 };
 
 Config config;
@@ -41,80 +48,26 @@ public:
 
     void OnStartup() override
     {
-        config.enabled = sConfigMgr->GetOption<bool>("pvp_zones.Enable", false);
+        config.enabled            = sConfigMgr->GetOption<bool>("pvp_zones.Enable", false);
+        config.kill_goal          = sConfigMgr->GetOption<uint32>("pvp_zones.KillGoal", false);
+        config.announcement_delay = sConfigMgr->GetOption<uint32>("pvp_zones.AnnouncementDelay", false);
         // config.zone_ids = sConfigMgr->GetOption<std::vector<uint32>>("pvp_zones.Zones", {});
         //    config.area_ids = sConfigMgr->GetOption<std::vector<uint32>>("pvp_zones.Areas", {});
     }
 };
 
-class ZoneCommands : public CommandScript
+/* TODO: change class name */
+class ZonePlayerScript : public PlayerScript, WorldScript
 {
 public:
-    ZoneCommands() : CommandScript("pvp_zones_Commands") {}
-
-    static bool HandleOnCommand(ChatHandler* handler, char const* args)
-    {
-        config.enabled = true;
-        handler->PSendSysMessage("PvP Zones Enabled");
-
-        return true;
-    }
-    static bool HandleOffCommand(ChatHandler* handler, char const* args)
-    {
-        config.enabled = false;
-        handler->PSendSysMessage("PvP Zones Disabled");
-
-        return true;
-    }
-
-    static bool HandleCreateCommand(ChatHandler* handler, char const* args)
-    {
-        /* TODO: finish */
-
-        auto map_it = std::begin(config.ids);
-        std::advance(map_it, rand() % config.ids.size());
-
-        auto area_it = std::begin(map_it->second);
-        std::advance(area_it, rand() % map_it->second.size());
-
-        uint32 zone = map_it->first;
-        uint32 area = *area_it;
-
-        std::string zone_name, area_name;
-
-        if (AreaTableEntry const* entry = sAreaTableStore.LookupEntry(area))
-        {
-            area_name = entry->area_name[handler->GetSessionDbcLocale()];
-
-            if (AreaTableEntry const* z_entry = sAreaTableStore.LookupEntry(zone))
-            {
-                zone_name = z_entry->area_name[handler->GetSessionDbcLocale()];
-            }
-        }
-
-        handler->SendGlobalSysMessage(("[pvp_zones] A new zone has been declared: " + zone_name + " - " + area_name).c_str());
-
-        return true;
-    }
-
-    std::vector<ChatCommand> GetCommands() const override
-    {
-        static std::vector<ChatCommand> commandTable = {{"pvp_zones_on", SEC_GAMEMASTER, false, &HandleOnCommand, ""}, {"pvp_zones_off", SEC_GAMEMASTER, false, &HandleOffCommand, ""}, {"pvp_zones_create", SEC_GAMEMASTER, false, &HandleCreateCommand, ""}};
-
-        return commandTable;
-    }
-};
-
-class ZonePlayerScript : public PlayerScript
-{
-public:
-    ZonePlayerScript() : PlayerScript("pvp_zones_PlayerScript") {}
+    ZonePlayerScript() : PlayerScript("pvp_zones_PlayerScript"), WorldScript("pvp_zones_WorldScript") {}
 
     /* adding/removing players that are currently in the area */
     void OnUpdateArea(Player* player, uint32, uint32 area) override
     {
         if (config.current_area == player->GetAreaId())
         {
+            ChatHandler((player->GetSession())).SendSysMessage("You have entered the PvP area");
             config.area_players.push_back(player);
         }
         else
@@ -131,9 +84,147 @@ public:
 
         if (config.current_zone == newZone)
         {
+            ChatHandler((player->GetSession())).SendSysMessage("You have entered a PvP zone");
             config.zone_players.push_back(player);
             player->SetPvP(true);
         }
+    }
+
+    void PostLeaderBoard(ChatHandler* handler)
+    {
+        handler->PSendSysMessage("PvP Zones Leaderboard:");
+        for (auto& player : config.points)
+        {
+            handler->PSendSysMessage("%s: %u", player.first->GetName().c_str(), player.second);
+        }
+    }
+
+    void PostAnnouncement(ChatHandler* handler)
+    {
+        if (!config.active)
+        {
+            return;
+        }
+        if (config.last_announcement + config.announcement_delay < sWorld->GetGameTime())
+        {
+            handler->PSendSysMessage("[pvp_zones] Is currently active in: %s - %s", config.current_zone_name.c_str(), config.current_area_name.c_str());
+            config.last_announcement = sWorld->GetGameTime();
+        }
+    }
+
+    static void CreateEvent(ChatHandler* handler)
+    {
+        config.active = true;
+
+        auto map_it = std::begin(config.ids);
+        std::advance(map_it, rand() % config.ids.size());
+
+        auto area_it = std::begin(map_it->second);
+        std::advance(area_it, rand() % map_it->second.size());
+
+        config.current_zone = map_it->first;
+        config.current_area = *area_it;
+
+        if (AreaTableEntry const* entry = sAreaTableStore.LookupEntry(config.current_area))
+        {
+            config.current_area_name = entry->area_name[handler->GetSessionDbcLocale()];
+
+            if (AreaTableEntry const* z_entry = sAreaTableStore.LookupEntry(config.current_zone))
+            {
+                config.current_zone_name = z_entry->area_name[handler->GetSessionDbcLocale()];
+            }
+        }
+
+        handler->SendGlobalSysMessage(("[pvp_zones] A new zone has been declared: " + config.current_zone_name + " - " + config.current_area_name).c_str());
+    }
+
+    void OnChat(Player* player, uint32 type, uint32 /* lang */, std::string& /* msg */) override
+    {
+        if (type != CHAT_MSG_CHANNEL)
+        {
+            return;
+        }
+
+        if (!config.last_announcement)
+        {
+            config.last_announcement = sWorld->GetGameTime();
+        }
+
+        ChatHandler handler = ChatHandler(player->GetSession());
+
+        PostAnnouncement(&handler);
+    }
+
+    void OnPVPKill(Player* winner /*killer*/, Player* loser /*killed*/) override
+    {
+        int points = 1;
+
+        /* point calculation / checks */
+        if (winner->GetAreaId() == config.current_area)
+        {
+            points *= 2;
+        }
+        if (winner->GetZoneId() == config.current_zone)
+        {
+            config.kill_goal--;
+
+            if (config.kill_goal % 5 == 0)
+            {
+                ChatHandler winner_handle = ChatHandler(winner->GetSession());
+                PostLeaderBoard(&winner_handle);
+            }
+
+            config.points.find(winner)->second += points;
+            if (config.points.find(loser)->second > 0)
+            {
+                config.points.find(loser)->second -= points;
+            }
+
+            if (config.kill_goal <= 0)
+            {
+                config.active = false;
+
+                ChatHandler(winner->GetSession()).SendGlobalSysMessage("[pvp_zones] The goal has been reached!");
+            }
+
+            ChatHandler(winner->GetSession()).SendSysMessage(("You have gained " + std::to_string(points) + " PvP points").c_str());
+            ChatHandler(loser->GetSession()).SendSysMessage(("You have lost " + std::to_string(points) + " PvP points").c_str());
+        }
+    }
+};
+
+class ZoneCommands : public CommandScript
+{
+public:
+    ZoneCommands() : CommandScript("pvp_zones_Commands") {}
+
+    static bool HandleOnCommand(ChatHandler* handler, char const*)
+    {
+        config.enabled = true;
+        handler->PSendSysMessage("PvP Zones Enabled");
+
+        return true;
+    }
+    static bool HandleOffCommand(ChatHandler* handler, char const*)
+    {
+        config.enabled = false;
+        handler->PSendSysMessage("PvP Zones Disabled");
+
+        return true;
+    }
+
+    static bool HandleCreateCommand(ChatHandler* handler, char const*)
+    {
+        ZonePlayerScript::CreateEvent(handler);
+
+        return true;
+    }
+
+    std::vector<ChatCommand> GetCommands() const override
+    {
+        static std::vector<ChatCommand> commandTable = {{"pvp_zones_on", SEC_GAMEMASTER, false, &HandleOnCommand, ""}, {"pvp_zones_off", SEC_GAMEMASTER, false, &HandleOffCommand, ""}, {"pvp_zones_create", SEC_GAMEMASTER, false, &HandleCreateCommand, ""}};
+
+        return commandTable;
     }
 };
 
@@ -141,5 +232,6 @@ public:
 void Addpvp_zonesScripts()
 {
     new ZoneConfig();
+    new ZonePlayerScript();
     new ZoneCommands();
 }
