@@ -65,10 +65,10 @@ public:
 };
 
 /* TODO: change class name */
-class ZonePlayerScript : public PlayerScript, WorldScript
+class ZoneLogicScript : public PlayerScript, WorldScript
 {
 public:
-    ZonePlayerScript() : PlayerScript("pvp_zones_PlayerScript"), WorldScript("pvp_zones_WorldScript") {}
+    ZoneLogicScript() : PlayerScript("pvp_zones_PlayerScript"), WorldScript("pvp_zones_WorldScript") {}
 
     /* adding/removing players that are currently in the area */
     void OnUpdateArea(Player* player, uint32 /* oldArea*/, uint32 newArea) override
@@ -213,34 +213,6 @@ public:
             ChatHandler(loser->GetSession()).SendSysMessage(("[pvp_zones] You have lost " + std::to_string(config.kill_points) + " PvP point(s)").c_str());
         }
     }
-
-    void OnUpdate(Player* player, uint32 p_time) override
-    {
-        if (!config.enabled)
-        {
-            return;
-        }
-
-        auto handle = ChatHandler(player->GetSession());
-
-        /* create event every x seconds based on config */
-        if (config.last_event + config.event_delay < sWorld->GetGameTime())
-        {
-            CreateEvent(&handle);
-        }
-
-        /* ends event if event is already running x seconds */
-        if (config.last_event + config.event_lasts < sWorld->GetGameTime())
-        {
-            EndEvent(&handle);
-        }
-
-        /* announcement stuff */
-        if (config.last_announcement + config.announcement_delay < sWorld->GetGameTime())
-        {
-            PostAnnouncement(&handle);
-        }
-    }
 };
 
 class ZoneCommands : public CommandScript
@@ -265,14 +237,14 @@ public:
 
     static bool HandleCreateCommand(ChatHandler* handler, char const*)
     {
-        ZonePlayerScript::CreateEvent(handler);
+        ZoneLogicScript::CreateEvent(handler);
 
         return true;
     }
 
     static bool HandleEndCommand(ChatHandler* handler, char const*)
     {
-        ZonePlayerScript::EndEvent(handler);
+        ZoneLogicScript::EndEvent(handler);
 
         return true;
     }
@@ -285,10 +257,44 @@ public:
     }
 };
 
+class ZoneWorld : public WorldScript
+{
+public:
+    ZoneWorld() : WorldScript("pvp_zones_World") {}
+
+    void OnUpdate(uint32 p_time) override
+    {
+        if (!config.enabled)
+        {
+            return;
+        }
+
+        auto handle = ChatHandler(player->GetSession());
+
+        /* create event every x seconds based on config */
+        if (config.last_event + config.event_delay < sWorld->GetGameTime())
+        {
+            ZoneCreateEvent(&handle);
+        }
+
+        /* ends event if event is already running x seconds */
+        if (config.last_event + config.event_lasts < sWorld->GetGameTime())
+        {
+            EndEvent(&handle);
+        }
+
+        /* announcement stuff */
+        if (config.last_announcement + config.announcement_delay < sWorld->GetGameTime())
+        {
+            PostAnnouncement(&handle);
+        }
+    }
+}
+
 // Add all scripts in one
 void Addpvp_zonesScripts()
 {
     new ZoneConfig();
-    new ZonePlayerScript();
+    new ZoneLogicScript();
     new ZoneCommands();
 }
