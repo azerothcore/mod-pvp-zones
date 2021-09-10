@@ -65,9 +65,9 @@ public:
     ZonePlayerScript() : PlayerScript("pvp_zones_PlayerScript"), WorldScript("pvp_zones_WorldScript") {}
 
     /* adding/removing players that are currently in the area */
-    void OnUpdateArea(Player* player, uint32, uint32 area) override
+    void OnUpdateArea(Player* player, uint32 /* oldArea*/, uint32 newArea) override
     {
-        if (config.current_area == player->GetAreaId())
+        if (config.current_area == newArea)
         {
             ChatHandler((player->GetSession())).SendSysMessage("You have entered the PvP area");
             config.area_players.push_back(player);
