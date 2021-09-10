@@ -179,6 +179,11 @@ public:
             return;
         }
 
+        if (!config.active)
+        {
+            return;
+        }
+
         if (!config.last_announcement)
         {
             config.last_announcement = sWorld->GetGameTime();
