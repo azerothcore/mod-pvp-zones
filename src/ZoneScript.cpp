@@ -16,8 +16,9 @@
 // hardcoded until i can get a vector using GEtOption
 struct Config
 {
-    bool   enabled   = true;
-    uint32 kill_goal = 0;
+    bool   enabled     = true;
+    uint32 kill_goal   = 0;
+    uint32 kill_points = 0;
 
     std::unordered_map<uint32 /* zone */, /* areas */ std::vector<uint32>> ids = {{10, {93, 536}}};
 
@@ -51,6 +52,7 @@ public:
         config.enabled            = sConfigMgr->GetOption<bool>("pvp_zones.Enable", false);
         config.kill_goal          = sConfigMgr->GetOption<uint32>("pvp_zones.KillGoal", false);
         config.announcement_delay = sConfigMgr->GetOption<uint32>("pvp_zones.AnnouncementDelay", false);
+        config.kill_points        = sConfigMgr->GetOption<uint32>("pvp_zones.KillPoints", false);
         // config.zone_ids = sConfigMgr->GetOption<std::vector<uint32>>("pvp_zones.Zones", {});
         //    config.area_ids = sConfigMgr->GetOption<std::vector<uint32>>("pvp_zones.Areas", {});
     }
@@ -76,6 +78,11 @@ public:
         }
     }
 
+    bool isPlayerInZone(Player* player)
+    {
+        return std::find(config.zone_players.begin(), config.zone_players.end(), player) != config.zone_players.end();
+    }
+
     void OnUpdateZone(Player* player, uint32 newZone, uint32 /* new area */) override
     {
         /* un/flagging player as pvp.
@@ -84,15 +91,24 @@ public:
 
         if (config.current_zone == newZone)
         {
-            ChatHandler((player->GetSession())).SendSysMessage("You have entered a PvP zone");
+            if (isPlayerInZone(player))
+            {
+                return;
+            }
+            ChatHandler((player->GetSession())).SendSysMessage("You have entered the PvP zone");
             config.zone_players.push_back(player);
             player->SetPvP(true);
+        }
+        else if (isPlayerInZone(player))
+        {
+            ChatHandler((player->GetSession())).SendSysMessage("You left the PvP zone");
+            config.zone_players.erase(std::remove(config.zone_players.begin(), config.zone_players.end(), player), config.zone_players.end());
         }
     }
 
     void PostLeaderBoard(ChatHandler* handler)
     {
-        handler->PSendSysMessage("PvP Zones Leaderboard:");
+        handler->SendGlobalSysMessage("PvP Zones Leaderboard:");
         for (auto& player : config.points)
         {
             handler->PSendSysMessage("%s: %u", player.first->GetName().c_str(), player.second);
@@ -138,6 +154,7 @@ public:
         handler->SendGlobalSysMessage(("[pvp_zones] A new zone has been declared: " + config.current_zone_name + " - " + config.current_area_name).c_str());
     }
 
+    /* TODO: find a better solution for this */
     void OnChat(Player* player, uint32 type, uint32 /* lang */, std::string& /* msg */) override
     {
         if (type != CHAT_MSG_CHANNEL)
@@ -157,12 +174,11 @@ public:
 
     void OnPVPKill(Player* winner /*killer*/, Player* loser /*killed*/) override
     {
-        int points = 1;
 
         /* point calculation / checks */
         if (winner->GetAreaId() == config.current_area)
         {
-            points *= 2;
+            config.kill_points *= 2;
         }
         if (winner->GetZoneId() == config.current_zone)
         {
@@ -174,10 +190,10 @@ public:
                 PostLeaderBoard(&winner_handle);
             }
 
-            config.points.find(winner)->second += points;
+            config.points.find(winner)->second += config.kill_points;
             if (config.points.find(loser)->second > 0)
             {
-                config.points.find(loser)->second -= points;
+                config.points.find(loser)->second -= config.kill_points;
             }
 
             if (config.kill_goal <= 0)
