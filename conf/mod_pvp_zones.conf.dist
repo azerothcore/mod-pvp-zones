@@ -3,3 +3,5 @@ pvp_zones.Enable = 1
 pvp_zones.KillGoal = 50
 pvp_zones.AnnouncementDelay = 300
 pvp_zones.KillPoints = 1
+pvp_zones.EventDelay = 10800
+pvp_zones.EventLasts = 3600
