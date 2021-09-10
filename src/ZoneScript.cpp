@@ -36,8 +36,12 @@ struct Config
 
     std::map<Player*, uint32> points;
 
-    time_t last_announcement  = 0;
-    time_t announcement_delay = 500;
+    time_t last_announcement;
+    time_t announcement_delay;
+
+    time_t last_event;
+    time_t event_delay;
+    time_t event_lasts;
 };
 
 Config config;
@@ -53,6 +57,8 @@ public:
         config.kill_goal          = sConfigMgr->GetOption<uint32>("pvp_zones.KillGoal", false);
         config.announcement_delay = sConfigMgr->GetOption<uint32>("pvp_zones.AnnouncementDelay", false);
         config.kill_points        = sConfigMgr->GetOption<uint32>("pvp_zones.KillPoints", false);
+        config.event_delay        = sConfigMgr->GetOption<uint32>("pvp_zones.EventDelay", false);
+        config.event_lasts        = sConfigMgr->GetOption<uint32>("pvp_zones.EventLasts", false);
         // config.zone_ids = sConfigMgr->GetOption<std::vector<uint32>>("pvp_zones.Zones", {});
         //    config.area_ids = sConfigMgr->GetOption<std::vector<uint32>>("pvp_zones.Areas", {});
     }
@@ -136,7 +142,8 @@ public:
             return;
         }
 
-        config.active = true;
+        config.active     = true;
+        config.last_event = sWorld->GetGameTime();
 
         auto map_it = std::begin(config.ids);
         std::advance(map_it, rand() % config.ids.size());
@@ -227,6 +234,26 @@ public:
 
             ChatHandler(winner->GetSession()).SendSysMessage(("[pvp_zones] You have gained " + std::to_string(config.kill_points) + " PvP point(s)").c_str());
             ChatHandler(loser->GetSession()).SendSysMessage(("[pvp_zones] You have lost " + std::to_string(config.kill_points) + " PvP point(s)").c_str());
+        }
+    }
+
+    void OnUpdate(Player* player, uint32 p_time) override
+    {
+        if (!config.enabled)
+        {
+            return;
+        }
+
+        /* create event every x seconds based on config */
+        if (config.last_event + config.event_delay < sWorld->GetGameTime())
+        {
+            CreateEvent(new ChatHandler(player->GetSession()));
+        }
+
+        /* ends event if event is already running x seconds */
+        if (config.last_event + config.event_lasts < sWorld->GetGameTime())
+        {
+            EndEvent(new ChatHandler(player->GetSession()));
         }
     }
 };
