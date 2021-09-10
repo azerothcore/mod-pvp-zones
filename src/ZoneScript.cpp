@@ -225,8 +225,8 @@ public:
                 ChatHandler(winner->GetSession()).SendGlobalSysMessage("[pvp_zones] The goal has been reached!");
             }
 
-            ChatHandler(winner->GetSession()).SendSysMessage(("You have gained " + std::to_string(config.kill_points) + " PvP points").c_str());
-            ChatHandler(loser->GetSession()).SendSysMessage(("You have lost " + std::to_string(config.kill_points) + " PvP points").c_str());
+            ChatHandler(winner->GetSession()).SendSysMessage(("[pvp_zones] You have gained " + std::to_string(config.kill_points) + " PvP point(s)").c_str());
+            ChatHandler(loser->GetSession()).SendSysMessage(("[pvp_zones] You have lost " + std::to_string(config.kill_points) + " PvP point(s)").c_str());
         }
     }
 };
