@@ -178,29 +178,6 @@ public:
         config.zone_players.clear();
     }
 
-    /* TODO: find a better solution for this */
-    void OnChat(Player* player, uint32 type, uint32 /* lang */, std::string& /* msg */) override
-    {
-        if (type != CHAT_MSG_CHANNEL)
-        {
-            return;
-        }
-
-        if (!config.active)
-        {
-            return;
-        }
-
-        if (!config.last_announcement)
-        {
-            config.last_announcement = sWorld->GetGameTime();
-        }
-
-        ChatHandler handler = ChatHandler(player->GetSession());
-
-        PostAnnouncement(&handler);
-    }
-
     void OnPVPKill(Player* winner /*killer*/, Player* loser /*killed*/) override
     {
 
@@ -215,7 +192,7 @@ public:
 
             ChatHandler winner_handle = ChatHandler(winner->GetSession());
 
-            if (config.kill_goal % 5 == 0)
+            if (config.kill_goal % 10 == 0)
             {
                 PostLeaderBoard(&winner_handle);
             }
@@ -244,16 +221,24 @@ public:
             return;
         }
 
+        auto handle = ChatHandler(player->GetSession());
+
         /* create event every x seconds based on config */
         if (config.last_event + config.event_delay < sWorld->GetGameTime())
         {
-            CreateEvent(new ChatHandler(player->GetSession()));
+            CreateEvent(&handle);
         }
 
         /* ends event if event is already running x seconds */
         if (config.last_event + config.event_lasts < sWorld->GetGameTime())
         {
-            EndEvent(new ChatHandler(player->GetSession()));
+            EndEvent(&handle);
+        }
+
+        /* announcement stuff */
+        if (config.last_announcement + config.announcement_delay < sWorld->GetGameTime())
+        {
+            PostAnnouncement(&handle);
         }
     }
 };
