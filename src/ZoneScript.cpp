@@ -130,6 +130,12 @@ public:
 
     static void CreateEvent(ChatHandler* handler)
     {
+        if (config.active)
+        {
+            handler->PSendSysMessage("[pvp_zones] Event already active");
+            return;
+        }
+
         config.active = true;
 
         auto map_it = std::begin(config.ids);
@@ -152,6 +158,17 @@ public:
         }
 
         handler->SendGlobalSysMessage(("[pvp_zones] A new zone has been declared: " + config.current_zone_name + " - " + config.current_area_name).c_str());
+    }
+
+    static void EndEvent(ChatHandler* handler)
+    {
+        config.active = false;
+        handler->SendGlobalSysMessage("[pvp_zones] The event has ended.");
+
+        /* reset */
+        config.points.clear();
+        config.area_players.clear();
+        config.zone_players.clear();
     }
 
     /* TODO: find a better solution for this */
@@ -203,8 +220,8 @@ public:
                 ChatHandler(winner->GetSession()).SendGlobalSysMessage("[pvp_zones] The goal has been reached!");
             }
 
-            ChatHandler(winner->GetSession()).SendSysMessage(("You have gained " + std::to_string(points) + " PvP points").c_str());
-            ChatHandler(loser->GetSession()).SendSysMessage(("You have lost " + std::to_string(points) + " PvP points").c_str());
+            ChatHandler(winner->GetSession()).SendSysMessage(("You have gained " + std::to_string(config.kill_points) + " PvP points").c_str());
+            ChatHandler(loser->GetSession()).SendSysMessage(("You have lost " + std::to_string(config.kill_points) + " PvP points").c_str());
         }
     }
 };
@@ -236,9 +253,16 @@ public:
         return true;
     }
 
+    static bool HandleEndCommand(ChatHandler* handler, char const*)
+    {
+        ZonePlayerScript::EndEvent(handler);
+
+        return true;
+    }
+
     std::vector<ChatCommand> GetCommands() const override
     {
-        static std::vector<ChatCommand> commandTable = {{"pvp_zones_on", SEC_GAMEMASTER, false, &HandleOnCommand, ""}, {"pvp_zones_off", SEC_GAMEMASTER, false, &HandleOffCommand, ""}, {"pvp_zones_create", SEC_GAMEMASTER, false, &HandleCreateCommand, ""}};
+        static std::vector<ChatCommand> commandTable = {{"pvp_zones_on", SEC_GAMEMASTER, false, &HandleOnCommand, ""}, {"pvp_zones_off", SEC_GAMEMASTER, false, &HandleOffCommand, ""}, {"pvp_zones_create", SEC_GAMEMASTER, false, &HandleCreateCommand, ""}, {"pvp_zones_end", SEC_GAMEMASTER, false, &HandleEndCommand, ""}};
 
         return commandTable;
     }
