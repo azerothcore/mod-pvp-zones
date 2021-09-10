@@ -206,9 +206,10 @@ public:
         {
             config.kill_goal--;
 
+            ChatHandler winner_handle = ChatHandler(winner->GetSession());
+
             if (config.kill_goal % 5 == 0)
             {
-                ChatHandler winner_handle = ChatHandler(winner->GetSession());
                 PostLeaderBoard(&winner_handle);
             }
 
@@ -220,9 +221,8 @@ public:
 
             if (config.kill_goal <= 0)
             {
-                config.active = false;
-
                 ChatHandler(winner->GetSession()).SendGlobalSysMessage("[pvp_zones] The goal has been reached!");
+                EndEvent(&winner_handle);
             }
 
             ChatHandler(winner->GetSession()).SendSysMessage(("[pvp_zones] You have gained " + std::to_string(config.kill_points) + " PvP point(s)").c_str());
