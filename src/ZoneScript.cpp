@@ -20,7 +20,7 @@ struct Config
     uint32 kill_goal   = 0;
     uint32 kill_points = 0;
 
-    std::unordered_map<uint32 /* zone */, /* areas */ std::vector<uint32>> ids = {{10, {93, 536}}};
+    std::unordered_map<uint32 /* zone */, std::vector<uint32> /* areas */> ids = {{10, {93, 536}}};
 
     /* non .conf stuff stuff */
     uint32 current_zone;
@@ -39,7 +39,7 @@ struct Config
     time_t last_announcement;
     time_t announcement_delay;
 
-    time_t last_event;
+    time_t last_event = 0;
     time_t event_delay;
     time_t event_lasts;
 };
@@ -103,7 +103,7 @@ public:
             }
             ChatHandler((player->GetSession())).SendSysMessage("You have entered the PvP zone");
             config.zone_players.push_back(player);
-            player->SetPvP(true);
+            player->UpdatePvP(true, true);
         }
         else if (isPlayerInZone(player))
         {
@@ -115,13 +115,20 @@ public:
     void PostLeaderBoard(ChatHandler* handler)
     {
         handler->SendGlobalSysMessage("PvP Zones Leaderboard:");
+
+        /* this should never happen */
+        if (config.points.empty())
+        {
+            return;
+        }
+
         for (auto& player : config.points)
         {
             handler->PSendSysMessage("%s: %u", player.first->GetName().c_str(), player.second);
         }
     }
 
-    void PostAnnouncement(ChatHandler* handler)
+    static void PostAnnouncement(ChatHandler* handler)
     {
         if (!config.active)
         {
@@ -188,16 +195,23 @@ public:
         }
         if (winner->GetZoneId() == config.current_zone)
         {
+            /* populate config.points */
+            if (config.points.find(winner) == config.points.end())
+            {
+                config.points.insert(std::make_pair(winner, config.kill_points));
+            }
+
+            if (config.points.find(loser) == config.points.end())
+            {
+                config.points.insert(std::make_pair(loser, 0));
+            }
+
             config.kill_goal--;
 
             ChatHandler winner_handle = ChatHandler(winner->GetSession());
 
-            if (config.kill_goal % 10 == 0)
-            {
-                PostLeaderBoard(&winner_handle);
-            }
-
             config.points.find(winner)->second += config.kill_points;
+
             if (config.points.find(loser)->second > 0)
             {
                 config.points.find(loser)->second -= config.kill_points;
@@ -211,6 +225,11 @@ public:
 
             ChatHandler(winner->GetSession()).SendSysMessage(("[pvp_zones] You have gained " + std::to_string(config.kill_points) + " PvP point(s)").c_str());
             ChatHandler(loser->GetSession()).SendSysMessage(("[pvp_zones] You have lost " + std::to_string(config.kill_points) + " PvP point(s)").c_str());
+
+            if (config.kill_goal % /* TODO: put this higher, temporary test value */ 1 == 0)
+            {
+                PostLeaderBoard(&winner_handle);
+            }
         }
     }
 };
@@ -269,29 +288,45 @@ public:
             return;
         }
 
-        auto handle = ChatHandler(player->GetSession());
+        SessionMap   m_sessions = sWorld->GetAllSessions();
+        Player*      player;
+        ChatHandler* handle;
+
+        for (SessionMap::iterator itr = m_sessions.begin(); itr != m_sessions.end(); ++itr)
+        {
+            if (!itr->second || !itr->second->GetPlayer() || !itr->second->GetPlayer()->IsInWorld())
+                continue;
+
+            player = itr->second->GetPlayer();
+        }
+
+        if (!player)
+        {
+            return;
+        }
+
+        handle = new ChatHandler(player->GetSession());
 
         /* create event every x seconds based on config */
         if (config.last_event + config.event_delay < sWorld->GetGameTime())
         {
-            ZoneCreateEvent(&handle);
+            ZoneLogicScript::CreateEvent(handle);
         }
 
         /* ends event if event is already running x seconds */
         if (config.last_event + config.event_lasts < sWorld->GetGameTime())
         {
-            EndEvent(&handle);
+            ZoneLogicScript::EndEvent(handle);
         }
 
         /* announcement stuff */
         if (config.last_announcement + config.announcement_delay < sWorld->GetGameTime())
         {
-            PostAnnouncement(&handle);
+            ZoneLogicScript::PostAnnouncement(handle);
         }
     }
-}
+};
 
-// Add all scripts in one
 void Addpvp_zonesScripts()
 {
     new ZoneConfig();
