@@ -276,6 +276,12 @@ public:
         return true;
     }
 
+    static bool HandleDebugCommand(ChatHandler* handler, char const*)
+    {
+        sLog->outString("[pvp_zones] Debug: active: %i, arena_name: %s, zone_name: %s, last_announcement: %i, last_event: %i, next_announcement: %is", config.active, config.current_area_name, config.current_zone_name, config.last_announcement, config.last_event, (config.last_announcement + config.announcement_delay) - sWorld->GetGameTime());
+        return true;
+    }
+
     std::vector<ChatCommand> GetCommands() const override
     {
         static std::vector<ChatCommand> commandTable = {{"pvp_zones_on", SEC_GAMEMASTER, false, &HandleOnCommand, ""}, {"pvp_zones_off", SEC_GAMEMASTER, false, &HandleOffCommand, ""}, {"pvp_zones_create", SEC_GAMEMASTER, false, &HandleCreateCommand, ""}, {"pvp_zones_end", SEC_GAMEMASTER, false, &HandleEndCommand, ""}};
