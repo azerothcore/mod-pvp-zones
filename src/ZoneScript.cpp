@@ -36,7 +36,7 @@ struct Config
 
     std::map<Player*, uint32> points;
 
-    time_t last_announcement;
+    time_t last_announcement = sWorld->GetGameTime();
     time_t announcement_delay;
 
     time_t last_event = 0;
