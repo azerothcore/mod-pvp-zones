@@ -4,6 +4,7 @@
 #include "DBCStores.h"
 #include "DBCStructure.h"
 #include "Define.h"
+#include "ObjectAccessor.h"
 #include "ObjectMgr.h"
 #include "Player.h"
 #include "ScriptMgr.h"
@@ -84,7 +85,7 @@ public:
         }
     }
 
-    bool isPlayerInZone(Player* player)
+    static bool isPlayerInZone(Player* player)
     {
         return std::find(config.zone_players.begin(), config.zone_players.end(), player) != config.zone_players.end();
     }
@@ -180,6 +181,23 @@ public:
         }
 
         handler->SendGlobalSysMessage(("[pvp_zones] A new zone has been declared: " + config.current_zone_name + " - " + config.current_area_name).c_str());
+
+        auto players = ObjectAccessor::GetPlayers();
+
+        for (auto& player : players)
+        {
+            if (player.second->GetZoneId() == config.current_zone)
+            {
+                player.second->SetPvP(true);
+                ChatHandler(player.second->GetSession()).SendSysMessage("You have entered the PvP zone");
+                config.zone_players.push_back(player.second);
+            }
+
+            if (player.second->GetAreaId() == config.current_area)
+            {
+                config.area_players.push_back(player.second);
+            }
+        }
     }
 
     static void EndEvent(ChatHandler* handler)
@@ -334,8 +352,9 @@ public:
         }
 
         /* announcement stuff */
-        if (config.last_announcement + config.announcement_delay < sWorld->GetGameTime())
+        if (config.last_announcement + config.announcement_delay <= sWorld->GetGameTime())
         {
+            sLog->outString("[pvp_zones] Announcement posted");
             ZoneLogicScript::PostAnnouncement(handle);
         }
     }
