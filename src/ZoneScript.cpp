@@ -89,6 +89,14 @@ public:
         return std::find(config.zone_players.begin(), config.zone_players.end(), player) != config.zone_players.end();
     }
 
+    void OnPlayerPVPFlagChange(Player* player, bool state) override
+    {
+        if (isPlayerInZone(player) && !state)
+        {
+            player->SetPvP(true);
+        }
+    }
+
     void OnUpdateZone(Player* player, uint32 newZone, uint32 /* new area */) override
     {
         /* un/flagging player as pvp.
