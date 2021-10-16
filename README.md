@@ -32,5 +32,5 @@ If you need to change the module configuration, go to your server configuration 
 
 ## Credits
 
-* [Me](https://github.com/iraizo) (author of the module): Checkout my website [raizo.dev](https://raizo.dev)
+* [Me](https://github.com/iraizo) (iraizo): Checkout my website [raizo.dev](https://raizo.dev)
 * AzerothCore: [repository](https://github.com/azerothcore) - [website](http://azerothcore.org/) - [discord chat community](https://discord.gg/PaqQRkd)
