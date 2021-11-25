@@ -260,19 +260,34 @@ public:
     }
 };
 
+using namespace Acore::ChatCommands;
 class ZoneCommands : public CommandScript
 {
 public:
     ZoneCommands() : CommandScript("pvp_zones_Commands") {}
 
-    static bool HandleOnCommand(ChatHandler* handler, char const*)
+    ChatCommandTable GetCommands() const override
+    {
+        static ChatCommandTable commandTable =
+        {
+            { "pvp_zones_on",     HandleOnCommand,     SEC_GAMEMASTER, Console::No },
+            { "pvp_zones_off",    HandleOffCommand,    SEC_GAMEMASTER, Console::No },
+            { "pvp_zones_create", HandleCreateCommand, SEC_GAMEMASTER, Console::No },
+            { "pvp_zones_end",    HandleEndCommand,    SEC_GAMEMASTER, Console::No },
+            { "pvp_zones_debug",  HandleDebugCommand,  SEC_GAMEMASTER, Console::No }
+        };
+
+        return commandTable;
+    }
+
+    static bool HandleOnCommand(ChatHandler* handler)
     {
         config.enabled = true;
         handler->PSendSysMessage("PvP Zones Enabled");
 
         return true;
     }
-    static bool HandleOffCommand(ChatHandler* handler, char const*)
+    static bool HandleOffCommand(ChatHandler* handler)
     {
         config.enabled = false;
         handler->PSendSysMessage("PvP Zones Disabled");
@@ -280,31 +295,24 @@ public:
         return true;
     }
 
-    static bool HandleCreateCommand(ChatHandler* handler, char const*)
+    static bool HandleCreateCommand(ChatHandler* handler)
     {
         ZoneLogicScript::CreateEvent(handler);
 
         return true;
     }
 
-    static bool HandleEndCommand(ChatHandler* handler, char const*)
+    static bool HandleEndCommand(ChatHandler* handler)
     {
         ZoneLogicScript::EndEvent(handler);
 
         return true;
     }
 
-    static bool HandleDebugCommand(ChatHandler* handler, char const*)
+    static bool HandleDebugCommand(ChatHandler* /* handler */)
     {
         sLog->outString("[pvp_zones] Debug: active: %i, arena_name: %s, zone_name: %s, last_announcement: %i, last_event: %i, next_announcement: %is", config.active, config.current_area_name, config.current_zone_name, config.last_announcement, config.last_event, (config.last_announcement + config.announcement_delay) - sWorld->GetGameTime());
         return true;
-    }
-
-    std::vector<ChatCommand> GetCommands() const override
-    {
-        static std::vector<ChatCommand> commandTable = {{"pvp_zones_on", SEC_GAMEMASTER, false, &HandleOnCommand, ""}, {"pvp_zones_off", SEC_GAMEMASTER, false, &HandleOffCommand, ""}, {"pvp_zones_create", SEC_GAMEMASTER, false, &HandleCreateCommand, ""}, {"pvp_zones_end", SEC_GAMEMASTER, false, &HandleEndCommand, ""}, {"pvp_zones_debug", SEC_GAMEMASTER, false, &HandleDebugCommand, ""}};
-
-        return commandTable;
     }
 };
 
@@ -313,7 +321,7 @@ class ZoneWorld : public WorldScript
 public:
     ZoneWorld() : WorldScript("pvp_zones_World") {}
 
-    void OnUpdate(uint32 p_time) override
+    void OnUpdate(uint32 /* p_time */) override
     {
         if (!config.enabled)
         {
