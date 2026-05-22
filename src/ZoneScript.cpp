@@ -83,6 +83,9 @@ public:
     /* adding/removing players that are currently in the area */
     void OnPlayerUpdateArea(Player* player, uint32 /* oldArea*/, uint32 newArea) override
     {
+        if (!config.enabled || !config.active)
+            return;
+
         if (config.current_area == newArea)
         {
             ChatHandler((player->GetSession())).SendSysMessage("You have entered the Oceanic War cffFFFFFFblood zone!");
@@ -99,12 +102,18 @@ public:
 
     void OnPlayerPVPFlagChange(Player* player, bool state) override
     {
+        if (!config.enabled || !config.active)
+            return;
+
         if (isPlayerInZone(player) && !state)
             player->SetPvP(true);
     }
 
     void OnPlayerUpdateZone(Player* player, uint32 newZone, uint32 /* new area */) override
     {
+        if (!config.enabled || !config.active)
+            return;
+
         /* un/flagging player as pvp.
            create some kind of pvp hook when pvp changes inside the zone
         */
@@ -133,7 +142,7 @@ public:
             return;
 
         for (auto& player : config.points)
-            handler->PSendSysMessage("%s: %u", player.first->GetName().c_str(), player.second);
+            handler->PSendSysMessage("{}: {}", player.first->GetName(), player.second);
     }
 
     static void PostAnnouncement(ChatHandler* handler)
@@ -142,7 +151,8 @@ public:
             return;
         if (config.last_announcement + config.announcement_delay < GameTime::GetGameTime().count())
         {
-            handler->PSendSysMessage("[pvp_zones] Is currently active in: %s - %s", config.current_zone_name.c_str(), config.current_area_name.c_str());
+            handler->SendGlobalSysMessage(
+                ("[pvp_zones] Is currently active in: " + config.current_zone_name + " - " + config.current_area_name).c_str());
             config.last_announcement = GameTime::GetGameTime().count();
         }
     }
@@ -196,6 +206,7 @@ public:
     static void EndEvent(ChatHandler* handler)
     {
         config.active = false;
+        config.last_event = GameTime::GetGameTime().count();
         handler->SendGlobalSysMessage("[pvp_zones] The event has ended.");
 
         /* reset */
@@ -206,6 +217,9 @@ public:
 
     void OnPlayerPVPKill(Player* winner /*killer*/, Player* loser /*killed*/) override
     {
+        if (!config.enabled || !config.active)
+            return;
+
         /* point calculation / checks */
         if (winner->GetAreaId() == config.current_area)
             config.kill_points *= 2;
@@ -312,7 +326,6 @@ public:
 
         WorldSessionMgr::SessionMap m_sessions = sWorldSessionMgr->GetAllSessions();
         Player* player = nullptr;
-        ChatHandler* handle;
 
         for (WorldSessionMgr::SessionMap::iterator itr = m_sessions.begin(); itr != m_sessions.end(); ++itr)
         {
@@ -325,22 +338,16 @@ public:
         if (!player)
             return;
 
-        handle = new ChatHandler(player->GetSession());
+        ChatHandler handler(player->GetSession());
 
-        /* create event every x seconds based on config */
-        if (config.last_event + config.event_delay < GameTime::GetGameTime().count())
-            ZoneLogicScript::CreateEvent(handle);
+        if (config.active && config.last_event + config.event_lasts < GameTime::GetGameTime().count())
+            ZoneLogicScript::EndEvent(&handler);
 
-        /* ends event if event is already running x seconds */
-        if (config.last_event + config.event_lasts < GameTime::GetGameTime().count())
-            ZoneLogicScript::EndEvent(handle);
+        if (!config.active && config.last_event + config.event_delay < GameTime::GetGameTime().count())
+            ZoneLogicScript::CreateEvent(&handler);
 
-        /* announcement stuff */
-        if (config.last_announcement + config.announcement_delay <= GameTime::GetGameTime().count())
-        {
-            LOG_INFO("module", "[pvp_zones] Announcement posted");
-            ZoneLogicScript::PostAnnouncement(handle);
-        }
+        if (config.active && config.last_announcement + config.announcement_delay <= GameTime::GetGameTime().count())
+            ZoneLogicScript::PostAnnouncement(&handler);
     }
 };
 
